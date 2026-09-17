@@ -1,0 +1,28 @@
+# Build outputs and local application state
+/dist/
+**/bin/
+**/obj/
+**/.organizer-state/
+*.exe
+*.dll
+*.pdb
+
+# IDE and personal settings
+/.vs/
+/.vscode/
+*.user
+*.suo
+.env
+.env.*
+
+# Personal reading guides, plans, screenshots and validation notes
+/docs/
+
+# Test fixtures and generated data; keep test source files
+/tests/*
+!/tests/*.cs
+
+# Operating system files
+Thumbs.db
+Desktop.ini
+.DS_Store
