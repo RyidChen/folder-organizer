@@ -6,13 +6,13 @@
 
 [下載最新 Windows 免安裝版](https://github.com/RyidChen/folder-organizer/releases/latest)
 
-一般使用者在 Release 的 Assets 下載 `FolderOrganizer-v1.0.0-Windows.zip`，按右鍵「全部解壓縮」，再雙擊 `FolderOrganizer.exe` 即可使用，不需要編譯或安裝開發工具。
+一般使用者在 Release 的 Assets 下載 `FolderOrganizer-v1.0.1-Windows.zip`，按右鍵「全部解壓縮」，再雙擊 `FolderOrganizer.exe` 即可使用，不需要編譯或安裝開發工具。
 
 請放在有寫入權限的位置，並保留程式旁的 `.organizer-state` 設定與復原紀錄。此版本尚未簽署數位簽章，Windows 可能顯示發行者驗證提示。
 
 ## 功能
 
-- 來源與整理目的地可自行選擇，目的地預設跟隨來源。
+- 來源與整理目的地可自行選擇，目的地預設與來源相同。
 - 依檔案類型分類：文件、圖片、影音、壓縮檔、安裝程式及其他。
 - 可新增或移除自訂分類，並在預覽中逐檔選擇。
 - 顯示掃描進度，支援取消；個別讀取失敗項目會略過並列出原因。

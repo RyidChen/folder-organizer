@@ -82,7 +82,7 @@ namespace DownloadOrganizer
             catch (Exception exception)
             {
                 // 損毀或無法讀取設定不應阻止開啟程式；把原因交給介面顯示。
-                warning = "無法載入上次設定，本次先使用預設值。\n" + exception.Message;
+                warning = "讀不到上次儲存的設定，已改用預設設定。\n" + exception.Message;
                 return new AppSettings();
             }
         }

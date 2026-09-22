@@ -43,10 +43,10 @@ namespace DownloadOrganizer
             layout.Controls.Add(new Label
             {
                 Dock = DockStyle.Fill,
-                Text = "新增分類會出現在預覽的下拉選單，例如「帳單」「工作資料」。\n"
-                    + "資料夾在確認整理後才建立；移除選項不會刪除檔案。\n"
-                    + "移除使用中的分類，預覽項目會改回「其他」。\n"
-                    + "內建的六種分類會保留。"
+                Text = "加入常用分類，例如「帳單」或「工作資料」。\n"
+                    + "開始整理時才會建立資料夾。移除分類不會刪除檔案，\n"
+                    + "已選用這個分類的檔案會改為「其他」。\n"
+                    + "文件、圖片等預設分類無法移除。"
             }, 0, 0);
 
             categoryList.Name = "customCategoryList";
@@ -69,7 +69,7 @@ namespace DownloadOrganizer
             inputRow.Controls.Add(addButton, 2, 0);
             layout.Controls.Add(inputRow, 0, 2);
 
-            var removeButton = new Button { Name = "removeCategory", Text = "移除選取的分類",
+            var removeButton = new Button { Name = "removeCategory", Text = "移除這個分類",
                 Width = 180, Height = 34, Enabled = false };
             categoryList.SelectedIndexChanged += (sender, eventArgs) =>
                 removeButton.Enabled = categoryList.SelectedIndex >= 0;

@@ -25,15 +25,17 @@ namespace DownloadOrganizer
         private readonly TextBox destinationTextBox = new TextBox();
         private readonly DataGridView previewGrid = new DataGridView();
         private readonly Label statusLabel = new Label();
+        private readonly Label emptyPreviewLabel = new Label();
         private readonly Button scanButton = new Button();
         private readonly Button organizeButton = new Button();
         private readonly Button undoButton = new Button();
         private readonly FlowLayoutPanel folderPanel = new FlowLayoutPanel();
         private readonly ProgressBar progressBar = new ProgressBar();
         private readonly Button manageCategoriesButton = new Button();
-        private readonly Button scanErrorsButton = new Button();
+        private readonly Button detailsButton = new Button();
         private readonly Button cancelScanButton = new Button();
-        private List<string> scanErrors = new List<string>();
+        private List<string> issueDetails = new List<string>();
+        private string issueTitle = "無法讀取的檔案";
         private int ignoredFileCount;
         private CancellationTokenSource scanCancellation;
 
@@ -41,6 +43,7 @@ namespace DownloadOrganizer
         private bool isBusy;                   // 檔案操作進行中，暫停介面操作。
         private bool hasCustomDestination;     // 使用者是否另外指定了目的地。
         private bool isPopulatingPreview;      // 填入表格時，不處理儲存格變更事件。
+        private bool hasScanned;               // 區分尚未掃描與掃描後沒有檔案。
 
         public MainWindow() : this(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".organizer-state"))
         {
@@ -71,7 +74,7 @@ namespace DownloadOrganizer
             layout.Controls.Add(CreateSelectionToolbar(), 0, 2);
 
             ConfigurePreviewGrid();
-            layout.Controls.Add(previewGrid, 0, 3);
+            layout.Controls.Add(CreatePreviewArea(), 0, 3);
 
             statusLabel.Dock = DockStyle.Fill;
             statusLabel.TextAlign = ContentAlignment.MiddleLeft;
@@ -116,14 +119,14 @@ namespace DownloadOrganizer
             var header = new Panel { Dock = DockStyle.Fill };
             header.Controls.Add(new Label
             {
-                Text = "把下載資料夾，整理回清爽。",
+                Text = "整理資料夾",
                 Font = new Font(Font.FontFamily, 21, FontStyle.Bold),
                 AutoSize = true,
                 Location = new Point(0, 0)
             });
             header.Controls.Add(new Label
             {
-                Text = "先掃描、再確認。檔案保留原名，整理結果可以復原。",
+                Text = "先檢查分類和移動位置，確認後再整理。",
                 AutoSize = true,
                 Location = new Point(2, 46),
                 ForeColor = Color.FromArgb(73, 89, 109)
@@ -170,7 +173,7 @@ namespace DownloadOrganizer
 
             if (isDestination)
             {
-                var resetButton = new Button { Text = "跟隨來源", Width = 100, Height = 35 };
+                var resetButton = new Button { Text = "與來源相同", Width = 116, Height = 35 };
                 resetButton.Click += (sender, eventArgs) =>
                 {
                     hasCustomDestination = false;
@@ -185,7 +188,7 @@ namespace DownloadOrganizer
             folderPanel.SizeChanged += (sender, eventArgs) =>
             {
                 row.Width = folderPanel.ClientSize.Width;
-                pathTextBox.Width = Math.Max(220, folderPanel.ClientSize.Width - 330);
+                pathTextBox.Width = Math.Max(220, folderPanel.ClientSize.Width - 346);
             };
         }
 
@@ -204,15 +207,15 @@ namespace DownloadOrganizer
             manageCategoriesButton.AutoSize = true;
             manageCategoriesButton.Click += (sender, eventArgs) => ManageCategories();
             toolbar.Controls.Add(manageCategoriesButton);
-            scanErrorsButton.Text = "查看略過原因";
-            scanErrorsButton.AutoSize = true;
-            scanErrorsButton.Enabled = false;
-            scanErrorsButton.Click += (sender, eventArgs) => ShowScanErrors();
-            toolbar.Controls.Add(scanErrorsButton);
-            toolbar.SetFlowBreak(scanErrorsButton, true);
+            detailsButton.Text = "查看原因";
+            detailsButton.AutoSize = true;
+            detailsButton.Enabled = false;
+            detailsButton.Click += (sender, eventArgs) => ShowIssueDetails();
+            toolbar.Controls.Add(detailsButton);
+            toolbar.SetFlowBreak(detailsButton, true);
             toolbar.Controls.Add(new Label
             {
-                Text = "只掃描最外層檔案；略過隱藏檔、連結與尚未完成的下載。",
+                Text = "不包含子資料夾；隱藏檔、連結和下載中的檔案會略過。",
                 AutoSize = true,
                 Padding = new Padding(0, 7, 0, 0)
             });
@@ -263,8 +266,43 @@ namespace DownloadOrganizer
             });
             previewGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
-                Name = "target", HeaderText = "完整目的地", ReadOnly = true, FillWeight = 240
+                Name = "target", HeaderText = "整理後的位置", ReadOnly = true, FillWeight = 240
             });
+        }
+
+        private Panel CreatePreviewArea()
+        {
+            var panel = new Panel { Dock = DockStyle.Fill };
+            panel.Controls.Add(previewGrid);
+            emptyPreviewLabel.Name = "emptyPreviewLabel";
+            emptyPreviewLabel.Dock = DockStyle.Fill;
+            emptyPreviewLabel.BackColor = Color.White;
+            emptyPreviewLabel.ForeColor = Color.FromArgb(73, 89, 109);
+            emptyPreviewLabel.Font = new Font(Font.FontFamily, 12);
+            emptyPreviewLabel.TextAlign = ContentAlignment.MiddleCenter;
+            emptyPreviewLabel.Padding = new Padding(24);
+            panel.Controls.Add(emptyPreviewLabel);
+            UpdateEmptyPreview();
+            return panel;
+        }
+
+        private void UpdateEmptyPreview()
+        {
+            bool isEmpty = previewGrid.Rows.Count == 0;
+            previewGrid.Visible = !isEmpty;
+            emptyPreviewLabel.Visible = isEmpty;
+            if (!isEmpty) return;
+
+            if (isBusy)
+                emptyPreviewLabel.Text = "正在讀取檔案…\n清單會在掃描完成後顯示。";
+            else if (issueDetails.Count > 0)
+                emptyPreviewLabel.Text = "部分檔案還沒處理完\n請按「查看原因」了解詳情。";
+            else if (hasScanned)
+                emptyPreviewLabel.Text = "這個資料夾沒有可整理的檔案\n可以選擇其他資料夾，再掃描一次。";
+            else
+                emptyPreviewLabel.Text = "先看看有哪些檔案\n選擇資料夾，再按「掃描檔案」。";
+
+            emptyPreviewLabel.BringToFront();
         }
 
         private FlowLayoutPanel CreateFooter()
@@ -361,7 +399,10 @@ namespace DownloadOrganizer
             if (isBusy)
             {
                 eventArgs.Cancel = true;
-                MessageBox.Show(this, "正在處理檔案，請等候完成後再關閉。", "處理中");
+                string message = scanCancellation != null
+                    ? "掃描還沒結束。若要關閉，請先按「取消掃描」。"
+                    : "檔案還在移動中，完成後就可以關閉。";
+                MessageBox.Show(this, message, "還在處理中");
             }
         }
 
@@ -402,7 +443,7 @@ namespace DownloadOrganizer
             string sourceDirectory = sourceTextBox.Text;
             string destinationDirectory = destinationTextBox.Text;
             ClearPreview();
-            SetBusyState(true, "正在讀取檔案與比對內容，大型檔案可能需要較久…");
+            SetBusyState(true, "正在掃描並檢查重複檔案…");
             scanCancellation = new CancellationTokenSource();
             cancelScanButton.Visible = true;
             cancelScanButton.Enabled = true;
@@ -421,7 +462,7 @@ namespace DownloadOrganizer
                 ScanResult result = await Task.Run(() => engine.ScanDetailed(
                     sourceDirectory, destinationDirectory, progress, token));
                 currentPlan = result.Entries;
-                scanErrors = result.Errors;
+                issueDetails = result.Errors;
                 ignoredFileCount = result.IgnoredCount;
                 isPopulatingPreview = true;
 
@@ -436,6 +477,7 @@ namespace DownloadOrganizer
                         entry.Target);
                     previewGrid.Rows[rowIndex].Tag = entry;
                 }
+                hasScanned = true;
             }
             catch (OperationCanceledException)
             {
@@ -472,13 +514,13 @@ namespace DownloadOrganizer
                 return;
             }
 
-            string confirmation = "即將依預覽移動 " + selectedEntries.Count + " 個檔案。"
+            string confirmation = "將移動選取的 " + selectedEntries.Count + " 個檔案。"
                 + "\n目的地：" + destinationTextBox.Text
-                + "\n\n保留原檔名；重複檔案不會刪除。";
+                + "\n\n檔名與預覽清單相同；重複檔案也會保留。";
 
             if (engine.HasUndo)
             {
-                confirmation += "\n\n這次整理會取代上一次的復原紀錄。";
+                confirmation += "\n\n這次整理後，只能復原這一批。上一次的復原紀錄會被取代。";
             }
 
             if (MessageBox.Show(this, confirmation, "確認整理",
@@ -490,7 +532,7 @@ namespace DownloadOrganizer
             await RunFileOperationAsync(
                 () => engine.Execute(selectedEntries),
                 "正在整理，請勿關閉程式…",
-                "整理流程完成");
+                "整理完成");
         }
 
         private async Task UndoAsync()
@@ -507,7 +549,7 @@ namespace DownloadOrganizer
             await RunFileOperationAsync(
                 () => engine.Undo(),
                 "正在復原，請勿關閉程式…",
-                "復原流程完成");
+                "復原完成");
         }
 
         /// <summary>整理與復原共用的背景執行、錯誤顯示及狀態恢復流程。</summary>
@@ -518,32 +560,32 @@ namespace DownloadOrganizer
             // 呼叫端可以傳入整理或復原，這裡不需要知道它是哪一種操作。
             SetBusyState(true, runningMessage);
             string resultMessage = completedMessage;
+            var operationErrors = new List<string>();
 
             try
             {
-                List<string> errors = await Task.Run(operation);
-                if (errors.Count > 0)
+                operationErrors = await Task.Run(operation);
+                if (operationErrors.Count > 0)
                 {
-                    resultMessage = completedMessage + "；有 " + errors.Count + " 個項目未完成。";
-                    string details = String.Join("\n", errors.Take(15));
-                    if (errors.Count > 15)
-                    {
-                        details += "\n其餘項目請重新掃描確認。";
-                    }
-
-                    MessageBox.Show(this, details, "部分項目未完成",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    resultMessage = "有 " + operationErrors.Count
+                        + " 個檔案未完成，請按「查看原因」。";
                 }
             }
             catch (Exception exception)
             {
-                resultMessage = "處理未完成，請查看訊息。";
-                MessageBox.Show(this, exception.Message, "無法完成操作");
+                resultMessage = "這次未能完成，請按「查看原因」。";
+                operationErrors.Add(exception.Message);
             }
             finally
             {
                 ClearPreview();
-                SetBusyState(false, resultMessage + " 請重新掃描以查看目前檔案。");
+                // 清單可以重掃，但失敗明細要保留，讓使用者稍後仍能查看全部原因。
+                issueDetails = operationErrors;
+                issueTitle = "未完成的檔案";
+                SetBusyState(false, resultMessage + " 按「掃描檔案」更新清單。");
+                emptyPreviewLabel.Text = operationErrors.Count > 0
+                    ? "部分檔案還沒處理完\n按「查看原因」了解詳情，或重新掃描。"
+                    : completedMessage + "\n按「掃描檔案」查看資料夾目前的內容。";
             }
         }
 
@@ -560,7 +602,7 @@ namespace DownloadOrganizer
             }
             catch (Exception exception)
             {
-                MessageBox.Show(this, "目前選擇仍可使用，但無法記住設定。\n" + exception.Message,
+                MessageBox.Show(this, "這次的選擇仍可使用，但設定沒有存下來，下次開啟需要重新選擇。\n" + exception.Message,
                     "設定儲存失敗", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
@@ -616,7 +658,7 @@ namespace DownloadOrganizer
 
             UpdateSelectionSummary();
             if (reassignedCount > 0)
-                statusLabel.Text += " 已將 " + reassignedCount + " 個被移除分類的項目改回「其他」。";
+                statusLabel.Text += " 已將 " + reassignedCount + " 個檔案的分類改回「其他」。";
         }
 
         private void UpdateScanProgress(ScanProgress progress)
@@ -632,11 +674,11 @@ namespace DownloadOrganizer
                 statusLabel.Text += "；正在讀取：" + progress.CurrentFile + "（" + progress.CurrentFilePercent + "%）";
         }
 
-        private void ShowScanErrors()
+        private void ShowIssueDetails()
         {
             using (var dialog = new Form
             {
-                Text = "掃描略過原因（檔案未被移動）", Size = new Size(780, 460),
+                Text = issueTitle, Size = new Size(780, 460),
                 StartPosition = FormStartPosition.CenterParent, Font = Font
             })
             {
@@ -645,7 +687,7 @@ namespace DownloadOrganizer
                 {
                     Dock = DockStyle.Fill, Multiline = true, ReadOnly = true,
                     ScrollBars = ScrollBars.Both, WordWrap = false,
-                    Text = String.Join(Environment.NewLine + Environment.NewLine, scanErrors)
+                    Text = String.Join(Environment.NewLine + Environment.NewLine, issueDetails)
                 });
                 dialog.ShowDialog(this);
             }
@@ -668,13 +710,16 @@ namespace DownloadOrganizer
 
         private void ClearPreview()
         {
-            scanErrors.Clear();
+            hasScanned = false;
+            issueTitle = "無法讀取的檔案";
+            issueDetails.Clear();
             ignoredFileCount = 0;
-            scanErrorsButton.Enabled = false;
+            detailsButton.Enabled = false;
             currentPlan.Clear();
             previewGrid.Rows.Clear();
             organizeButton.Enabled = false;
-            statusLabel.Text = "資料夾已變更，請重新掃描。";
+            statusLabel.Text = "按「掃描檔案」查看這個資料夾的檔案。";
+            UpdateEmptyPreview();
         }
 
         private void SetAllSelections(bool isSelected)
@@ -684,9 +729,18 @@ namespace DownloadOrganizer
                 return;
             }
 
-            foreach (DataGridViewRow row in previewGrid.Rows)
+            // 全選時先暫停逐列的統計更新，避免 N 個檔案重算 N 次。
+            isPopulatingPreview = true;
+            try
             {
-                row.Cells["pick"].Value = isSelected;
+                foreach (DataGridViewRow row in previewGrid.Rows)
+                {
+                    row.Cells["pick"].Value = isSelected;
+                }
+            }
+            finally
+            {
+                isPopulatingPreview = false;
             }
 
             UpdateSelectionSummary();
@@ -701,10 +755,24 @@ namespace DownloadOrganizer
 
             int selectedCount = GetSelectedEntries().Count;
             organizeButton.Enabled = selectedCount > 0;
-            statusLabel.Text = String.Format(
-                "可整理 {0} 個，已勾選 {1} 個；讀取失敗 {2} 個，略過隱藏／未完成等 {3} 個。",
-                currentPlan.Count, selectedCount, scanErrors.Count, ignoredFileCount);
-            scanErrorsButton.Enabled = scanErrors.Count > 0;
+            if (!hasScanned && currentPlan.Count == 0)
+            {
+                statusLabel.Text = issueDetails.Count > 0
+                    ? "有 " + issueDetails.Count + " 個檔案未完成，請按「查看原因」。"
+                    : "按「掃描檔案」查看這個資料夾的檔案。";
+            }
+            else
+            {
+                statusLabel.Text = currentPlan.Count == 0
+                    ? "沒有可整理的檔案。"
+                    : String.Format("共 {0} 個檔案，已選 {1} 個。", currentPlan.Count, selectedCount);
+                if (issueDetails.Count > 0)
+                    statusLabel.Text += " " + issueDetails.Count + " 個檔案無法讀取，請查看原因。";
+                if (ignoredFileCount > 0)
+                    statusLabel.Text += " 另有 " + ignoredFileCount + " 個檔案已略過。";
+            }
+            detailsButton.Enabled = issueDetails.Count > 0;
+            UpdateEmptyPreview();
         }
 
         private void RefreshTargetPaths()
@@ -732,23 +800,33 @@ namespace DownloadOrganizer
             previewGrid.Enabled = !busy;
             scanButton.Enabled = !busy;
             manageCategoriesButton.Enabled = !busy;
-            scanErrorsButton.Enabled = !busy && scanErrors.Count > 0;
+            detailsButton.Enabled = !busy && issueDetails.Count > 0;
             organizeButton.Enabled = !busy && currentPlan.Count > 0;
             undoButton.Enabled = !busy && engine.HasUndo;
             progressBar.Visible = busy;
             if (busy) progressBar.Style = ProgressBarStyle.Marquee;
             statusLabel.Text = message;
+            UpdateEmptyPreview();
         }
 
         private static string FormatFileSize(long bytes)
         {
             // 除數加上 d 表示 double，避免整數除法截掉小數。
+            if (bytes >= 1073741824)
+            {
+                return (bytes / 1073741824d).ToString("0.0") + " GB";
+            }
             if (bytes >= 1048576)
             {
                 return (bytes / 1048576d).ToString("0.0") + " MB";
             }
 
-            return (bytes / 1024d).ToString("0.0") + " KB";
+            if (bytes >= 1024)
+            {
+                return (bytes / 1024d).ToString("0.0") + " KB";
+            }
+
+            return bytes + " B";
         }
 
         private static string GetDownloadsDirectory()
@@ -785,7 +863,7 @@ namespace DownloadOrganizer
                 FileAccess.ReadWrite, FileShare.None))
             {
                 await ScanAsync();
-                if (scanErrors.Count != 1 || !scanErrorsButton.Enabled || currentPlan.Count == 0)
+                if (issueDetails.Count != 1 || !detailsButton.Enabled || currentPlan.Count == 0)
                     throw new Exception("UI did not retain preview and error details after a locked file");
             }
             File.Delete(lockedFixture);
