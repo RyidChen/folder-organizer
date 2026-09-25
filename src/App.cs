@@ -29,7 +29,7 @@ namespace DownloadOrganizer
         private readonly Button scanButton = new Button();
         private readonly Button organizeButton = new Button();
         private readonly Button undoButton = new Button();
-        private readonly FlowLayoutPanel folderPanel = new FlowLayoutPanel();
+        private readonly TableLayoutPanel folderPanel = new TableLayoutPanel();
         private readonly ProgressBar progressBar = new ProgressBar();
         private readonly Button manageCategoriesButton = new Button();
         private readonly Button detailsButton = new Button();
@@ -52,6 +52,9 @@ namespace DownloadOrganizer
         // 額外的建構子讓介面測試使用獨立設定位置，不影響使用者的偏好。
         internal MainWindow(string stateDirectory)
         {
+            SuspendLayout();
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            AutoScaleMode = AutoScaleMode.Dpi;
             engine = new Engine(stateDirectory);
             settingsStore = new SettingsStore(stateDirectory);
             string settingsWarning;
@@ -65,7 +68,6 @@ namespace DownloadOrganizer
             Font = new Font("Microsoft JhengHei UI", 10);
             BackColor = Color.FromArgb(246, 248, 251);
             ForeColor = Color.FromArgb(27, 40, 58);
-            AutoScaleMode = AutoScaleMode.Dpi;
 
             TableLayoutPanel layout = CreateMainLayout();
             Controls.Add(layout);
@@ -77,6 +79,8 @@ namespace DownloadOrganizer
             layout.Controls.Add(CreatePreviewArea(), 0, 3);
 
             statusLabel.Dock = DockStyle.Fill;
+            statusLabel.AutoSize = true;
+            statusLabel.Padding = new Padding(0, 10, 0, 10);
             statusLabel.TextAlign = ContentAlignment.MiddleLeft;
             statusLabel.AutoEllipsis = true;
             statusLabel.Text = "選擇資料夾後，按「掃描檔案」預覽整理建議。";
@@ -86,6 +90,7 @@ namespace DownloadOrganizer
             organizeButton.Enabled = false;
             undoButton.Enabled = engine.HasUndo;
             ConnectEvents();
+            ResumeLayout(true);
             if (!String.IsNullOrEmpty(settingsWarning))
             {
                 Shown += (sender, eventArgs) => MessageBox.Show(this, settingsWarning, "設定載入提示");
@@ -93,6 +98,21 @@ namespace DownloadOrganizer
         }
 
         // ── 介面建立：先閱讀建構子，想了解某一塊畫面時再往下找。 ──
+
+        protected override void OnLoad(EventArgs e)
+        {
+            FitToWorkingArea(this);
+            base.OnLoad(e);
+        }
+
+        internal static void FitToWorkingArea(Form window)
+        {
+            Rectangle area = Screen.FromControl(window).WorkingArea;
+            window.MinimumSize = new Size(Math.Min(window.MinimumSize.Width, area.Width),
+                Math.Min(window.MinimumSize.Height, area.Height));
+            window.Size = new Size(Math.Min(window.Width, area.Width),
+                Math.Min(window.Height, area.Height));
+        }
 
         private TableLayoutPanel CreateMainLayout()
         {
@@ -104,41 +124,51 @@ namespace DownloadOrganizer
                 RowCount = 6
             };
 
-            // 除了檔案表格吃掉剩餘空間，其他區塊使用固定高度。
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 116));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
+            // 文字區塊依內容決定高度，表格使用剩餘空間。
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             return layout;
         }
 
         private Panel CreateHeader()
         {
-            var header = new Panel { Dock = DockStyle.Fill };
+            var header = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1,
+                Padding = new Padding(0, 0, 0, 12) };
             header.Controls.Add(new Label
             {
                 Text = "整理資料夾",
                 Font = new Font(Font.FontFamily, 21, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(0, 0)
+                Dock = DockStyle.Top
             });
             header.Controls.Add(new Label
             {
                 Text = "先檢查分類和移動位置，確認後再整理。",
                 AutoSize = true,
-                Location = new Point(2, 46),
+                Dock = DockStyle.Top,
                 ForeColor = Color.FromArgb(73, 89, 109)
             });
             return header;
         }
 
-        private FlowLayoutPanel CreateFolderPanel()
+        private TableLayoutPanel CreateFolderPanel()
         {
-            folderPanel.Dock = DockStyle.Fill;
-            folderPanel.FlowDirection = FlowDirection.TopDown;
-            folderPanel.WrapContents = false;
+            folderPanel.Dock = DockStyle.Top;
+            folderPanel.AutoSize = true;
+            folderPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            folderPanel.ColumnCount = 4;
+            folderPanel.RowCount = 2;
+            folderPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            folderPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            folderPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            folderPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            folderPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            folderPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             sourceTextBox.Text = String.IsNullOrWhiteSpace(settings.SourceDirectory)
                 ? GetDownloadsDirectory() : settings.SourceDirectory;
@@ -152,28 +182,30 @@ namespace DownloadOrganizer
 
         private void AddFolderPicker(string caption, TextBox pathTextBox, bool isDestination)
         {
-            var row = new FlowLayoutPanel { Width = 1000, Height = 49, WrapContents = false };
-            row.Controls.Add(new Label
+            int row = isDestination ? 1 : 0;
+            folderPanel.Controls.Add(new Label
             {
                 Text = caption,
-                Width = 100,
-                Height = 35,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
                 TextAlign = ContentAlignment.MiddleLeft
-            });
+            }, 0, row);
 
-            pathTextBox.Width = 550;
+            pathTextBox.Dock = DockStyle.Fill;
             pathTextBox.ReadOnly = true;
             pathTextBox.Margin = new Padding(0, 7, 10, 0);
-            row.Controls.Add(pathTextBox);
+            folderPanel.Controls.Add(pathTextBox, 1, row);
 
-            var chooseButton = new Button { Text = "選擇…", Width = 90, Height = 35 };
+            var chooseButton = new Button { Text = "選擇…", AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(10, 4, 10, 4) };
             chooseButton.Click += (sender, eventArgs) =>
                 ChooseFolder(caption, pathTextBox, isDestination);
-            row.Controls.Add(chooseButton);
+            folderPanel.Controls.Add(chooseButton, 2, row);
 
             if (isDestination)
             {
-                var resetButton = new Button { Text = "與來源相同", Width = 116, Height = 35 };
+                var resetButton = new Button { Text = "與來源相同", AutoSize = true,
+                    AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(10, 4, 10, 4) };
                 resetButton.Click += (sender, eventArgs) =>
                 {
                     hasCustomDestination = false;
@@ -181,20 +213,15 @@ namespace DownloadOrganizer
                     ClearPreview();
                     SavePreferences();
                 };
-                row.Controls.Add(resetButton);
+                folderPanel.Controls.Add(resetButton, 3, row);
             }
 
-            folderPanel.Controls.Add(row);
-            folderPanel.SizeChanged += (sender, eventArgs) =>
-            {
-                row.Width = folderPanel.ClientSize.Width;
-                pathTextBox.Width = Math.Max(220, folderPanel.ClientSize.Width - 346);
-            };
         }
 
         private FlowLayoutPanel CreateSelectionToolbar()
         {
-            var toolbar = new FlowLayoutPanel { Dock = DockStyle.Fill };
+            var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(0, 6, 0, 10) };
             var selectAllButton = new Button { Text = "全選", AutoSize = true };
             var deselectAllButton = new Button { Text = "取消全選", AutoSize = true };
 
@@ -309,7 +336,9 @@ namespace DownloadOrganizer
         {
             var footer = new FlowLayoutPanel
             {
-                Dock = DockStyle.Fill,
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.RightToLeft
             };
 
@@ -341,7 +370,9 @@ namespace DownloadOrganizer
         private void ConfigureButton(Button button, string text, bool isPrimary)
         {
             button.Text = text;
-            button.Size = new Size(148, 42);
+            button.AutoSize = true;
+            button.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            button.Padding = new Padding(14, 6, 14, 6);
             button.FlatStyle = FlatStyle.Flat;
             button.Margin = new Padding(10, 0, 0, 0);
             button.FlatAppearance.BorderSize = isPrimary ? 0 : 1;

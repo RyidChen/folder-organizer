@@ -6,7 +6,7 @@
 
 [下載最新 Windows 免安裝版](https://github.com/RyidChen/folder-organizer/releases/latest)
 
-一般使用者在 Release 的 Assets 下載 `FolderOrganizer-v1.0.1-Windows.zip`，按右鍵「全部解壓縮」，再雙擊 `FolderOrganizer.exe` 即可使用，不需要編譯或安裝開發工具。
+一般使用者在 Release 的 Assets 下載 `FolderOrganizer-v1.0.2-Windows.zip`，按右鍵「全部解壓縮」，再雙擊 `FolderOrganizer.exe` 即可使用，不需要編譯或安裝開發工具。
 
 請放在有寫入權限的位置，並保留程式旁的 `.organizer-state` 設定與復原紀錄。此版本尚未簽署數位簽章，Windows 可能顯示發行者驗證提示。
 

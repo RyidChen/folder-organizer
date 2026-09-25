@@ -63,6 +63,23 @@ internal static class UiBehaviorTests
     private static async Task Run(MainWindow window, string root)
     {
         SaveScreenshot(window, Path.Combine(root, "initial.png"));
+        Size originalSize = window.Size;
+        window.Size = window.MinimumSize;
+        window.PerformLayout();
+        CheckTextFits(window);
+        SaveScreenshot(window, Path.Combine(root, "minimum-size.png"));
+        window.Size = originalSize;
+        using (var categories = new CategoryDialog(new[] { "工作資料", "帳單" }))
+        {
+            categories.StartPosition = FormStartPosition.Manual;
+            categories.Location = new Point(-30000, -30000);
+            categories.Show(window);
+            categories.Size = categories.MinimumSize;
+            categories.PerformLayout();
+            CheckTextFits(categories);
+            SaveScreenshot(categories, Path.Combine(root, "categories.png"));
+            categories.Close();
+        }
         var formatSize = typeof(MainWindow).GetMethod("FormatFileSize",
             BindingFlags.Static | BindingFlags.NonPublic);
         // 實際大小不能因為格式化而顯示成 0 KB。
@@ -118,6 +135,23 @@ internal static class UiBehaviorTests
         Check(!status.Text.StartsWith("整理完成"), "partial failure does not claim complete success");
         SaveScreenshot(window, Path.Combine(root, "errors.png"));
         Console.WriteLine("UI screenshots: " + root);
+    }
+
+    private static void CheckTextFits(Control parent)
+    {
+        foreach (Control control in parent.Controls)
+        {
+            if (!control.Visible) continue;
+            if (control is Button || (control is Label && ((Label)control).AutoSize))
+            {
+                Size preferred = control.GetPreferredSize(new Size(control.Width, 0));
+                Check(control.Height >= preferred.Height,
+                    "text height fits: " + control.Text.Replace("\n", " "));
+                Check(control.Right <= parent.ClientSize.Width && control.Bottom <= parent.ClientSize.Height,
+                    "control stays inside parent: " + control.Text.Replace("\n", " "));
+            }
+            CheckTextFits(control);
+        }
     }
 
     private static void SaveScreenshot(Form window, string path)

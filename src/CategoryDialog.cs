@@ -20,13 +20,15 @@ namespace DownloadOrganizer
 
         public CategoryDialog(IEnumerable<string> existingCategories)
         {
+            SuspendLayout();
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            AutoScaleMode = AutoScaleMode.Dpi;
             customCategories = new List<string>(existingCategories);
             Text = "管理自訂分類";
             Font = new Font("Microsoft JhengHei UI", 10);
             ClientSize = new Size(560, 440);
             MinimumSize = new Size(540, 420);
             StartPosition = FormStartPosition.CenterParent;
-            AutoScaleMode = AutoScaleMode.Dpi;
             MinimizeBox = false;
             MaximizeBox = false;
 
@@ -34,15 +36,16 @@ namespace DownloadOrganizer
             {
                 Dock = DockStyle.Fill, Padding = new Padding(20), ColumnCount = 1, RowCount = 5
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             Controls.Add(layout);
             layout.Controls.Add(new Label
             {
                 Dock = DockStyle.Fill,
+                AutoSize = true,
                 Text = "加入常用分類，例如「帳單」或「工作資料」。\n"
                     + "開始整理時才會建立資料夾。移除分類不會刪除檔案，\n"
                     + "已選用這個分類的檔案會改為「其他」。\n"
@@ -54,23 +57,26 @@ namespace DownloadOrganizer
             categoryList.IntegralHeight = false;
             layout.Controls.Add(categoryList, 0, 1);
 
-            var inputRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3 };
-            inputRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
+            var inputRow = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 3, RowCount = 1 };
+            inputRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            inputRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             inputRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            inputRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+            inputRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             inputRow.Controls.Add(new Label { Text = "資料夾名稱", Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
+                AutoSize = true, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
             nameTextBox.Name = "categoryName";
             nameTextBox.Dock = DockStyle.Fill;
             nameTextBox.MaxLength = 100;
             inputRow.Controls.Add(nameTextBox, 1, 0);
-            var addButton = new Button { Name = "addCategory", Text = "新增", Dock = DockStyle.Fill };
+            var addButton = new Button { Name = "addCategory", Text = "新增", AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(8, 4, 8, 4) };
             addButton.Click += (sender, eventArgs) => AddCategory();
             inputRow.Controls.Add(addButton, 2, 0);
             layout.Controls.Add(inputRow, 0, 2);
 
             var removeButton = new Button { Name = "removeCategory", Text = "移除這個分類",
-                Width = 180, Height = 34, Enabled = false };
+                AutoSize = true, Padding = new Padding(8, 4, 8, 4), Enabled = false };
             categoryList.SelectedIndexChanged += (sender, eventArgs) =>
                 removeButton.Enabled = categoryList.SelectedIndex >= 0;
             removeButton.Click += (sender, eventArgs) =>
@@ -81,12 +87,13 @@ namespace DownloadOrganizer
             };
             layout.Controls.Add(removeButton, 0, 3);
 
-            var actions = new FlowLayoutPanel { Dock = DockStyle.Fill,
+            var actions = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.RightToLeft };
             var applyButton = new Button { Text = "套用", DialogResult = DialogResult.OK,
-                Width = 90, Height = 34 };
+                AutoSize = true, Padding = new Padding(8, 4, 8, 4) };
             var cancelButton = new Button { Text = "取消", DialogResult = DialogResult.Cancel,
-                Width = 90, Height = 34 };
+                AutoSize = true, Padding = new Padding(8, 4, 8, 4) };
             actions.Controls.Add(applyButton);
             actions.Controls.Add(cancelButton);
             layout.Controls.Add(actions, 0, 4);
@@ -94,6 +101,13 @@ namespace DownloadOrganizer
             // Enter 在名稱欄輸入時優先新增，避免尚未新增就關閉視窗。
             AcceptButton = addButton;
             RefreshList();
+            ResumeLayout(true);
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            MainWindow.FitToWorkingArea(this);
+            base.OnLoad(e);
         }
 
         private void AddCategory()
